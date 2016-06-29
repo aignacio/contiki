@@ -6,7 +6,8 @@ BOARD_SOURCEFILES += board.c launchpad-sensors.c leds-arch.c button-sensor.c
 BOARD_SOURCEFILES += ext-flash.c board-spi.c
 
 PYTHON = python
-BSL_FLAGS += -e -w -v
+BSL_FLAGS += -e -w -v -b 115200
+
 
 ifdef PORT
   BSL_FLAGS += -p $(PORT)

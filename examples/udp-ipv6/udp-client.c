@@ -38,6 +38,10 @@
 #define DEBUG DEBUG_PRINT
 #include "net/ip/uip-debug.h"
 
+#ifndef UIP_CONF_ROUTER
+#define UIP_CONF_ROUTER  1
+#endif
+
 #define SEND_INTERVAL		15 * CLOCK_SECOND
 #define MAX_PAYLOAD_LEN		40
 
