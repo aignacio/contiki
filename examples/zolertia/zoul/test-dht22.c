@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2007, Swedish Institute of Computer Science
+ * Copyright (c) 2016, Zolertia <http://www.zolertia.com>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -29,79 +29,60 @@
  * This file is part of the Contiki operating system.
  *
  */
-
+/**
+ * \addtogroup zoul-examples
+ * @{
+ *
+ * \defgroup zoul-dht22-test DHT22 temperature and humidity sensor test
+ *
+ * Demonstrates the use of the DHT22 digital temperature and humidity sensor
+ * @{
+ *
+ * \file
+ *         A quick program for testing the DHT22 temperature and humidity sensor
+ * \author
+ *         Antonio Lignan <alinan@zolertia.com>
+ */
+/*---------------------------------------------------------------------------*/
 #include <stdio.h>
-
-#include "contiki-net.h"
-#include "net/ethernet.h"
-#include "net/ip/tcpip.h"
-#include "net/ipv4/uip-neighbor.h"
-
-#include "net/ethernet-drv.h"
-
-#define BUF ((struct uip_eth_hdr *)&uip_buf[0])
-#define IPBUF ((struct uip_tcpip_hdr *)&uip_buf[UIP_LLH_LEN])
-
-PROCESS(ethernet_process, "Ethernet driver");
-
+#include "contiki.h"
+#include "dev/dht22.h"
 /*---------------------------------------------------------------------------*/
-uint8_t
-#if NETSTACK_CONF_WITH_IPV6
-ethernet_output(const uip_lladdr_t *)
-#else
-ethernet_output(void)
-#endif
-{
-  uip_arp_out();
-  ethernet_send();
-  
-  return 0;
-}
+PROCESS(remote_dht22_process, "DHT22 test");
+AUTOSTART_PROCESSES(&remote_dht22_process);
 /*---------------------------------------------------------------------------*/
-static void
-pollhandler(void)
-{
-  process_poll(&ethernet_process);
-  uip_len = ethernet_poll();
-
-  if(uip_len > 0) {
-#if NETSTACK_CONF_WITH_IPV6
-    if(BUF->type == uip_htons(UIP_ETHTYPE_IPV6)) {
-      uip_neighbor_add(&IPBUF->srcipaddr, (struct uip_neighbor_addr *)&BUF->src);
-      tcpip_input();
-    } else
-#endif /* NETSTACK_CONF_WITH_IPV6 */
-    if(BUF->type == uip_htons(UIP_ETHTYPE_IP)) {
-      uip_len -= sizeof(struct uip_eth_hdr);
-      tcpip_input();
-    } else if(BUF->type == uip_htons(UIP_ETHTYPE_ARP)) {
-      uip_arp_arpin();
-      /* If the above function invocation resulted in data that
-         should be sent out on the network, the global variable
-         uip_len is set to a value > 0. */
-      if(uip_len > 0) {
-        ethernet_send();
-      }
-    }
-  }
-}
+static struct etimer et;
 /*---------------------------------------------------------------------------*/
-PROCESS_THREAD(ethernet_process, ev, data)
+PROCESS_THREAD(remote_dht22_process, ev, data)
 {
-  PROCESS_POLLHANDLER(pollhandler());
+  int16_t temperature, humidity;
 
   PROCESS_BEGIN();
+  SENSORS_ACTIVATE(dht22);
 
-  ethernet_init((struct ethernet_config *)data);
+  /* Let it spin and read sensor data */
 
-  tcpip_set_outputfunc(ethernet_output);
+  while(1) {
+    etimer_set(&et, CLOCK_SECOND);
+    PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&et));
 
-  process_poll(&ethernet_process);
-
-  PROCESS_WAIT_UNTIL(ev == PROCESS_EVENT_EXIT);
-
-  ethernet_exit();
-
+    /* The standard sensor API may be used to read sensors individually, using
+     * the `dht22.value(DHT22_READ_TEMP)` and `dht22.value(DHT22_READ_HUM)`,
+     * however a single read operation (5ms) returns both values, so by using
+     * the function below we save one extra operation
+     */
+    if(dht22_read_all(&temperature, &humidity) != DHT22_ERROR) {
+      printf("Temperature %02d.%02d ºC, ", temperature / 10, temperature % 10);
+      printf("Humidity %02d.%02d RH\n", humidity / 10, humidity % 10);
+    } else {
+      printf("Failed to read the sensor\n");
+    }
+  }
   PROCESS_END();
 }
 /*---------------------------------------------------------------------------*/
+/**
+ * @}
+ * @}
+ */
+
